@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>novel-writer-skills — AI 网文小说创作技能包</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:#2a2a3a;
+  --text:#e4e4ef;--text2:#9090a8;--accent:#6c5ce7;--accent2:#a29bfe;
+  --green:#00d2b4;--orange:#f39c12;--red:#e74c3c;--blue:#3498db;
+  --glow:0 0 40px rgba(108,92,231,.15);
+  --radius:12px;
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+a{color:var(--accent2);text-decoration:none;transition:color .2s}
+a:hover{color:var(--green)}
+
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* ---- Hero ---- */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;padding:80px 24px}
+.hero::before{content:"";position:absolute;top:-40%;left:-20%;width:60vw;height:60vw;background:radial-gradient(circle,rgba(108,92,231,.12) 0%,transparent 70%);pointer-events:none}
+.hero::after{content:"";position:absolute;bottom:-30%;right:-15%;width:50vw;height:50vw;background:radial-gradient(circle,rgba(0,210,180,.08) 0%,transparent 70%);pointer-events:none}
+.hero-inner{position:relative;z-index:1}
+.badge{display:inline-block;padding:6px 16px;border:1px solid var(--border);border-radius:100px;font-size:.8rem;color:var(--text2);margin-bottom:24px;letter-spacing:.5px}
+.badge span{color:var(--green)}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);font-weight:800;line-height:1.15;margin-bottom:20px;background:linear-gradient(135deg,var(--text) 30%,var(--accent2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:1.15rem;color:var(--text2);max-width:600px;margin:0 auto 40px}
+.hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:var(--radius);font-size:.95rem;font-weight:600;cursor:pointer;border:none;transition:all .25s}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 20px rgba(108,92,231,.35)}
+.btn-primary:hover{background:#7c6ef0;transform:translateY(-2px);box-shadow:0 6px 28px rgba(108,92,231,.45)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent2);color:var(--accent2)}
+
+/* ---- Install bar ---- */
+.install-bar{margin-top:48px}
+.code-box{display:inline-flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;font-family:"SF Mono",SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:.88rem;color:var(--green);cursor:pointer;transition:border-color .2s;position:relative;max-width:100%;overflow-x:auto}
+.code-box:hover{border-color:var(--accent2)}
+.code-box .copy-hint{position:absolute;top:-32px;left:50%;transform:translateX(-50%);font-size:.75rem;color:var(--accent2);opacity:0;transition:opacity .3s;font-family:-apple-system,sans-serif;pointer-events:none}
+.code-box:hover .copy-hint{opacity:1}
+
+/* ---- Sections ---- */
+section{padding:100px 0}
+.section-label{font-size:.8rem;text-transform:uppercase;letter-spacing:2px;color:var(--accent2);margin-bottom:12px}
+.section-title{font-size:2rem;font-weight:700;margin-bottom:16px}
+.section-desc{color:var(--text2);max-width:600px;margin-bottom:48px}
+
+/* ---- Feature cards ---- */
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.feature-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;transition:all .3s}
+.feature-card:hover{border-color:var(--accent);box-shadow:var(--glow);transform:translateY(-4px)}
+.feature-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:16px}
+.feature-card h3{font-size:1.05rem;font-weight:600;margin-bottom:8px}
+.feature-card p{font-size:.88rem;color:var(--text2);line-height:1.6}
+
+/* ---- Modes ---- */
+.modes-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.mode-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px 24px;position:relative;overflow:hidden;transition:all .3s}
+.mode-card:hover{border-color:var(--green);box-shadow:0 0 30px rgba(0,210,180,.1);transform:translateY(-4px)}
+.mode-num{position:absolute;top:16px;right:20px;font-size:3rem;font-weight:900;color:var(--surface2);line-height:1}
+.mode-card h3{font-size:1.15rem;font-weight:700;margin-bottom:8px;position:relative}
+.mode-card .mode-tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.72rem;font-weight:600;margin-bottom:12px}
+.mode-card p{font-size:.88rem;color:var(--text2);line-height:1.65;position:relative}
+.mode-card ul{list-style:none;margin-top:12px;position:relative}
+.mode-card li{font-size:.82rem;color:var(--text2);padding:4px 0;padding-left:18px;position:relative}
+.mode-card li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;border-radius:50%}
+
+/* ---- Pipeline ---- */
+.pipeline{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;margin:48px 0}
+.pipe-step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;text-align:center;min-width:160px;transition:all .3s}
+.pipe-step:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.pipe-step h4{font-size:.95rem;font-weight:600;margin-bottom:4px}
+.pipe-step p{font-size:.78rem;color:var(--text2)}
+.pipe-arrow{font-size:1.5rem;color:var(--accent2);padding:0 8px;flex-shrink:0}
+
+/* ---- CLI demo ---- */
+.terminal{background:#0d0d14;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;max-width:700px;margin:0 auto}
+.terminal-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.terminal-dot{width:12px;height:12px;border-radius:50%}
+.terminal-title{font-size:.78rem;color:var(--text2);margin-left:8px}
+.terminal-body{padding:20px 24px;font-family:"SF Mono",SFMono-Regular,Consolas,monospace;font-size:.82rem;line-height:1.9;overflow-x:auto}
+.terminal-body .prompt{color:var(--green)}
+.terminal-body .cmd{color:var(--text)}
+.terminal-body .output{color:var(--text2)}
+.terminal-body .highlight{color:var(--orange)}
+.terminal-body .error{color:var(--red)}
+.terminal-body .success{color:var(--green)}
+
+/* ---- Emotion curve ---- */
+.curve-container{max-width:700px;margin:0 auto}
+.curve-bar{display:flex;align-items:flex-end;gap:4px;height:200px;padding:0 0 32px}
+.curve-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.curve-fill{width:100%;border-radius:6px 6px 0 0;transition:height .6s ease;position:relative}
+.curve-label{font-size:.7rem;color:var(--text2);white-space:nowrap;position:absolute;bottom:-24px;left:50%;transform:translateX(-50%)}
+.curve-val{font-size:.65rem;font-weight:600;margin-bottom:2px}
+.curve-axis{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text2);border-top:1px solid var(--border);padding-top:8px;margin-top:4px}
+
+/* ---- Stats ---- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-top:48px}
+.stat-card{text-align:center;padding:28px 16px}
+.stat-num{font-size:2.2rem;font-weight:800;background:linear-gradient(135deg,var(--accent2),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-label{font-size:.85rem;color:var(--text2);margin-top:4px}
+
+/* ---- Agents ---- */
+.agents-grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.agent-badge{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface);border:1px solid var(--border);border-radius:100px;font-size:.85rem;color:var(--text2);transition:all .25s}
+.agent-badge:hover{border-color:var(--accent);color:var(--text)}
+
+/* ---- CTA ---- */
+.cta{text-align:center;padding:100px 24px;background:linear-gradient(180deg,var(--bg) 0%,var(--surface) 100%)}
+.cta h2{font-size:2rem;font-weight:700;margin-bottom:12px}
+.cta p{color:var(--text2);margin-bottom:36px}
+
+/* ---- Footer ---- */
+footer{text-align:center;padding:40px 24px;color:var(--text2);font-size:.82rem;border-top:1px solid var(--border)}
+
+/* ---- Responsive ---- */
+@media(max-width:640px){
+  .hero{padding:60px 16px;min-height:auto}
+  h1{font-size:2rem}
+  section{padding:60px 0}
+  .pipeline{flex-direction:column}
+  .pipe-arrow{transform:rotate(90deg)}
+  .curve-bar{height:150px}
+}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="badge">Open Source <span>&#x2022;</span> Agent Skills Ecosystem</div>
+    <h1>AI 网文小说<br>创作技能包</h1>
+    <p>一句灵感，四步流水线，自动生成高质量网文。<br>支持 Cursor / OpenClaw / Claude Code 等 40+ AI Agent。</p>
+    <div class="hero-actions">
+      <a href="#install" class="btn btn-primary">快速开始</a>
+      <a href="https://github.com/bolecodex/novel-writer-skills" target="_blank" class="btn btn-secondary">GitHub</a>
+    </div>
+    <div class="install-bar">
+      <div class="code-box" onclick="copyInstall(this)" title="点击复制">
+        <span class="copy-hint">点击复制</span>
+        <span>$</span>
+        <span>npx skills add bolecodex/novel-writer-skills -y -g</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">WHY</div>
+    <div class="section-title">为什么用这个技能包？</div>
+    <div class="section-desc">传统 AI 写小说 = 一锅粥 prompt。这个技能包把网文创作拆解成可编排的工业化流水线。</div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(108,92,231,.15);color:var(--accent2)">&#x1f9e0;</div>
+        <h3>9 套脑洞公式</h3>
+        <p>涵盖玄幻、都市、末世、诡异、穿越等主流题材的结构化创意模板。从灵感到完整方案只需一步。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(0,210,180,.15);color:var(--green)">&#x1f4ca;</div>
+        <h3>情绪价值量化</h3>
+        <p>E-Value 模型精确控制 10 章节奏曲线，从 -8 虐心低谷到 +9 爽快高峰，让读者欲罢不能。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(243,156,18,.15);color:var(--orange)">&#x1f6ab;</div>
+        <h3>AI 味检测</h3>
+        <p>内置 30+ 禁用词和 7 个正则模式，自动扫描「嘴角上扬」「眼神坚定」等 AI 八股文病句。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(52,152,219,.15);color:var(--blue)">&#x2699;&#xfe0f;</div>
+        <h3>CLI 确定性校验</h3>
+        <p>字数精确到字、对话比例精确到 1%。每章写完自动 validate，不达标不放行。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Modes -->
+<section id="modes" style="background:var(--surface)">
+  <div class="container">
+    <div class="section-label">MODES</div>
+    <div class="section-title">四种创作模式</div>
+    <div class="section-desc">单独使用或串联成流水线，覆盖从灵感到成稿的完整链路。</div>
+    <div class="modes-grid">
+      <div class="mode-card">
+        <div class="mode-num">01</div>
+        <div class="mode-tag" style="background:rgba(108,92,231,.15);color:var(--accent2)">创意</div>
+        <h3>脑洞生成</h3>
+        <p>从一个灵感火花并行生成 3 个高概念故事方案</p>
+        <ul>
+          <li style="color:var(--accent2)"><span style="color:var(--text2)">使用不同公式自动组合</span></li>
+          <li style="color:var(--accent2)"><span style="color:var(--text2)">完整人设+世界观+爽点循环</span></li>
+          <li style="color:var(--accent2)"><span style="color:var(--text2)">附带 12-18 行爆款文案</span></li>
+        </ul>
+        <style>.mode-card:nth-child(1) li::before{background:var(--accent2)}</style>
+      </div>
+      <div class="mode-card">
+        <div class="mode-num">02</div>
+        <div class="mode-tag" style="background:rgba(0,210,180,.15);color:var(--green)">起步</div>
+        <h3>黄金三章</h3>
+        <p>写出决定读者去留的前 3 章</p>
+        <ul>
+          <li><span style="color:var(--text2)">每章 2200-2600 字精确控制</span></li>
+          <li><span style="color:var(--text2)">每章必含反套路转折</span></li>
+          <li><span style="color:var(--text2)">对话占比 &ge; 40%</span></li>
+        </ul>
+        <style>.mode-card:nth-child(2) li::before{background:var(--green)}</style>
+      </div>
+      <div class="mode-card">
+        <div class="mode-num">03</div>
+        <div class="mode-tag" style="background:rgba(243,156,18,.15);color:var(--orange)">完整</div>
+        <h3>10 章短篇</h3>
+        <p>一个完整的短篇小说，总计 9000-12000 字</p>
+        <ul>
+          <li><span style="color:var(--text2)">E-Value 情绪曲线引导</span></li>
+          <li><span style="color:var(--text2)">第 4 章精准卡付费点</span></li>
+          <li><span style="color:var(--text2)">对话占比 &ge; 50%</span></li>
+        </ul>
+        <style>.mode-card:nth-child(3) li::before{background:var(--orange)}</style>
+      </div>
+      <div class="mode-card">
+        <div class="mode-num">04</div>
+        <div class="mode-tag" style="background:rgba(52,152,219,.15);color:var(--blue)">打磨</div>
+        <h3>审稿润色</h3>
+        <p>对已有稿件打分、点评、自动润色</p>
+        <ul>
+          <li><span style="color:var(--text2)">8 维度专业评审报告</span></li>
+          <li><span style="color:var(--text2)">禁用词一键替换</span></li>
+          <li><span style="color:var(--text2)">输出润色对比稿</span></li>
+        </ul>
+        <style>.mode-card:nth-child(4) li::before{background:var(--blue)}</style>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pipeline -->
+<section id="pipeline">
+  <div class="container">
+    <div class="section-label">PIPELINE</div>
+    <div class="section-title">流水线模式</div>
+    <div class="section-desc">四步串联，从灵感到完稿一气呵成。</div>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <h4>脑洞生成</h4>
+        <p>3 个方案并行生成</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <h4>用户选择</h4>
+        <p>挑选最喜欢的方案</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <h4>黄金三章 / 10章</h4>
+        <p>自动写作+CLI校验</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="pipe-step">
+        <h4>审稿润色</h4>
+        <p>评审+润色+终稿</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Emotion curve -->
+<section style="background:var(--surface)">
+  <div class="container" style="text-align:center">
+    <div class="section-label">E-VALUE</div>
+    <div class="section-title">情绪价值曲线</div>
+    <div class="section-desc" style="margin:0 auto 48px">10 章节奏的情绪波动，从低谷虐心到高峰爽快，精确量化控制。</div>
+    <div class="curve-container">
+      <div class="curve-bar" id="curveBar"></div>
+      <div class="curve-axis">
+        <span>第 1 章</span>
+        <span>第 4 章 (付费点)</span>
+        <span>第 10 章</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLI Demo -->
+<section id="cli">
+  <div class="container" style="text-align:center">
+    <div class="section-label">CLI</div>
+    <div class="section-title">novel-cli 校验工具</div>
+    <div class="section-desc" style="margin:0 auto 48px">确定性检查，让 AI 写出的每一章都达标。</div>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot" style="background:#ff5f57"></div>
+        <div class="terminal-dot" style="background:#febc2e"></div>
+        <div class="terminal-dot" style="background:#28c840"></div>
+        <div class="terminal-title">novel-cli</div>
+      </div>
+      <div class="terminal-body">
+        <div><span class="prompt">$</span> <span class="cmd">novel-cli count output.txt --format text</span></div>
+        <div class="output">Ch  1:  2456 chars, dialogue 45%</div>
+        <div class="output">Ch  2:  2380 chars, dialogue 42%</div>
+        <div class="output">Ch  3:  2510 chars, dialogue 48%</div>
+        <div class="output" style="margin-top:4px">Total: 7346 chars across 3 chapters</div>
+        <br>
+        <div><span class="prompt">$</span> <span class="cmd">novel-cli scan output.txt --format text</span></div>
+        <div class="success">No banned words or patterns found. &#x2713;</div>
+        <br>
+        <div><span class="prompt">$</span> <span class="cmd">novel-cli validate output.txt</span></div>
+        <div class="output">{</div>
+        <div class="output">&nbsp;&nbsp;"mode": "<span class="highlight">golden</span>",</div>
+        <div class="output">&nbsp;&nbsp;"chapter_count": 3,</div>
+        <div class="output">&nbsp;&nbsp;"total_chars": <span class="highlight">7346</span>,</div>
+        <div class="output">&nbsp;&nbsp;"errors": [],</div>
+        <div class="output">&nbsp;&nbsp;"warnings": [],</div>
+        <div class="output">&nbsp;&nbsp;"passed": <span class="success">true</span></div>
+        <div class="output">}</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-num">30+</div>
+        <div class="stat-label">禁用词规则</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">7</div>
+        <div class="stat-label">正则模式检测</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">4</div>
+        <div class="stat-label">校验命令</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">&#xb1;5%</div>
+        <div class="stat-label">字数精度</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Agents -->
+<section style="background:var(--surface)">
+  <div class="container" style="text-align:center">
+    <div class="section-label">COMPATIBLE</div>
+    <div class="section-title">支持 40+ AI Agent</div>
+    <div class="section-desc" style="margin:0 auto 48px">基于开放 Agent Skills 标准，一次安装，处处可用。</div>
+    <div class="agents-grid">
+      <div class="agent-badge">&#x1f4bb; Cursor</div>
+      <div class="agent-badge">&#x1f9e0; OpenClaw</div>
+      <div class="agent-badge">&#x1f4ac; Claude Code</div>
+      <div class="agent-badge">&#x1f4e6; Codex</div>
+      <div class="agent-badge">&#x2728; Windsurf</div>
+      <div class="agent-badge">&#x1f310; Trae</div>
+      <div class="agent-badge">&#x1f916; Gemini CLI</div>
+      <div class="agent-badge">&#x1f680; OpenCode</div>
+      <div class="agent-badge">&#x1f40d; Cline</div>
+      <div class="agent-badge">&#x1f310; GitHub Copilot</div>
+      <div class="agent-badge">&#x1f3af; Roo Code</div>
+      <div class="agent-badge">+ 30 more...</div>
+    </div>
+  </div>
+</section>
+
+<!-- Install -->
+<section class="cta" id="install">
+  <div class="container">
+    <div class="section-label">GET STARTED</div>
+    <h2>30 秒开始创作</h2>
+    <p>两条命令，安装技能和 CLI 工具。</p>
+    <div style="display:flex;flex-direction:column;gap:16px;align-items:center;margin-bottom:36px">
+      <div class="code-box" onclick="copyInstall(this)" style="text-align:left">
+        <span class="copy-hint">点击复制</span>
+        <span style="color:var(--text2)"># 安装技能</span><br>
+        <span>$ npx skills add bolecodex/novel-writer-skills -y -g</span>
+      </div>
+      <div class="code-box" onclick="copyInstall(this)" style="text-align:left">
+        <span class="copy-hint">点击复制</span>
+        <span style="color:var(--text2)"># 安装 CLI</span><br>
+        <span>$ pip install "novel-cli @ git+https://github.com/bolecodex/novel-writer-skills.git#subdirectory=novel-cli"</span>
+      </div>
+    </div>
+    <p style="color:var(--text2);font-size:.85rem">或一键安装：</p>
+    <div class="code-box" onclick="copyInstall(this)" style="margin-top:12px">
+      <span class="copy-hint">点击复制</span>
+      <span>$ bash &lt;(curl -fsSL https://raw.githubusercontent.com/bolecodex/novel-writer-skills/main/scripts/setup.sh)</span>
+    </div>
+    <div style="margin-top:36px">
+      <a href="https://github.com/bolecodex/novel-writer-skills" target="_blank" class="btn btn-primary">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>MIT License &middot; <a href="https://github.com/bolecodex/novel-writer-skills">bolecodex/novel-writer-skills</a></p>
+  </div>
+</footer>
+
+<script>
+function copyInstall(el) {
+  const text = el.innerText.replace('点击复制', '').replace(/^\$\s*/gm, '').replace(/^#.*$/gm, '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const hint = el.querySelector('.copy-hint');
+    if (hint) { hint.textContent = '已复制!'; hint.style.opacity = '1'; setTimeout(() => { hint.textContent = '点击复制'; hint.style.opacity = ''; }, 1500); }
+  });
+}
+
+// Emotion curve
+const eValues = [
+  { ch: 1, val: -3, label: '虐点建立' },
+  { ch: 2, val: -5, label: '虐点递进' },
+  { ch: 3, val: -7, label: '虐点加深' },
+  { ch: 4, val: -8, label: '情绪最低谷' },
+  { ch: 5, val: -5, label: '反转开始' },
+  { ch: 6, val: -2, label: '反击初步' },
+  { ch: 7, val: 2,  label: '势均力敌' },
+  { ch: 8, val: 5,  label: '优势建立' },
+  { ch: 9, val: 7,  label: '全面反攻' },
+  { ch: 10, val: 9, label: '大结局' },
+];
+
+const bar = document.getElementById('curveBar');
+eValues.forEach(d => {
+  const col = document.createElement('div');
+  col.className = 'curve-col';
+  const normalized = (d.val + 10) / 20;
+  const height = Math.max(normalized * 100, 8);
+  const color = d.val < 0 ? `hsl(${0 + (d.val + 10) * 4}, 70%, 55%)` : `hsl(${150 + d.val * 5}, 65%, 50%)`;
+  const valSpan = document.createElement('span');
+  valSpan.className = 'curve-val';
+  valSpan.style.color = color;
+  valSpan.textContent = (d.val > 0 ? '+' : '') + d.val;
+  const fill = document.createElement('div');
+  fill.className = 'curve-fill';
+  fill.style.height = height + '%';
+  fill.style.background = color;
+  const label = document.createElement('span');
+  label.className = 'curve-label';
+  label.textContent = '第' + d.ch + '章';
+  fill.appendChild(label);
+  col.appendChild(valSpan);
+  col.appendChild(fill);
+  bar.appendChild(col);
+});
+
+// Animate on scroll
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.style.opacity = '1'; });
+}, { threshold: 0.1 });
+document.querySelectorAll('.feature-card,.mode-card,.pipe-step,.stat-card').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transition = 'opacity .6s ease, transform .3s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
