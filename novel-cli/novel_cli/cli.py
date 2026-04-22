@@ -93,10 +93,12 @@ def _dialogue_ratio(text: str) -> float:
 
 
 @click.group()
-@click.version_option("1.0.0")
+@click.version_option("1.1.0")
 def cli():
     """novel-cli: Web novel validation toolkit."""
     pass
+
+
 
 
 @cli.command()
@@ -220,9 +222,13 @@ def outline(file, fmt):
 
 @cli.command()
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--mode", type=click.Choice(["golden", "short", "auto"]), default="auto",
-              help="Validation mode: golden (黄金三章), short (10章短篇), auto-detect.")
-def validate(file, mode):
+@click.option("--mode", type=click.Choice(["golden", "short", "long", "auto"]), default="auto",
+              help="Validation mode: golden (黄金三章), short (10章短篇), long (长篇), auto-detect.")
+@click.option("--from", "ch_from", type=int, default=None,
+              help="Only validate chapters starting from this number (inclusive).")
+@click.option("--to", "ch_to", type=int, default=None,
+              help="Only validate chapters up to this number (inclusive).")
+def validate(file, mode, ch_from, ch_to):
     """Run full validation: word count + banned words + format check."""
     text = _read_file(file)
     chapters = _split_chapters(text)
@@ -230,10 +236,26 @@ def validate(file, mode):
     warnings = []
 
     if mode == "auto":
-        mode = "golden" if len(chapters) <= 3 else "short"
+        if len(chapters) <= 3:
+            mode = "golden"
+        elif len(chapters) <= 15:
+            mode = "short"
+        else:
+            mode = "long"
 
-    min_chars, max_chars = (2090, 2730) if mode == "golden" else (950, 1260)
-    label = "2200-2600±5%" if mode == "golden" else "1000-1200±5%"
+    if ch_from is not None or ch_to is not None:
+        lo = ch_from if ch_from is not None else 0
+        hi = ch_to if ch_to is not None else 999999
+        chapters = [ch for ch in chapters if lo <= ch["number"] <= hi]
+        if not chapters:
+            errors.append(f"No chapters found in range {lo}-{hi}")
+
+    if mode == "golden":
+        min_chars, max_chars, label = 2090, 2730, "2200-2600±5%"
+        dialogue_threshold = 0.40
+    else:
+        min_chars, max_chars, label = 950, 1260, "1000-1200±5%"
+        dialogue_threshold = 0.50
 
     for ch in chapters:
         cc = _count_chars(ch["body"])
@@ -242,23 +264,24 @@ def validate(file, mode):
                 f"Ch {ch['number']}: {cc} chars — outside target {label}"
             )
         dr = _dialogue_ratio(ch["body"])
-        threshold = 0.40 if mode == "golden" else 0.50
-        if dr < threshold:
+        if dr < dialogue_threshold:
             warnings.append(
-                f"Ch {ch['number']}: dialogue ratio {dr:.0%} < {threshold:.0%} target"
+                f"Ch {ch['number']}: dialogue ratio {dr:.0%} < {dialogue_threshold:.0%} target"
             )
 
     banned_count = 0
-    for line in text.split("\n"):
-        for word in BANNED_WORDS:
-            banned_count += line.count(word)
-        for pattern in BANNED_PATTERNS:
-            banned_count += len(pattern.findall(line))
+    for ch in chapters:
+        for line in ch["body"].split("\n"):
+            for word in BANNED_WORDS:
+                banned_count += line.count(word)
+            for pattern in BANNED_PATTERNS:
+                banned_count += len(pattern.findall(line))
     if banned_count > 0:
         errors.append(f"Banned words/patterns found: {banned_count} instances (run 'scan' for details)")
 
     total = sum(_count_chars(ch["body"]) for ch in chapters)
-    if mode == "short":
+
+    if mode == "short" and ch_from is None and ch_to is None:
         if total < 9000 or total > 12000:
             errors.append(f"Total chars {total} outside 9000-12000 range")
 
@@ -266,13 +289,14 @@ def validate(file, mode):
     if not has_chapter_counts and chapters:
         warnings.append("Missing [本章字数：XXXX] markers")
 
-    expected = list(range(1, len(chapters) + 1))
     actual = [ch["number"] for ch in chapters]
+    expected = list(range(actual[0], actual[0] + len(actual))) if actual else []
     if actual != expected:
-        errors.append(f"Non-sequential chapters: got {actual}, expected {expected}")
+        errors.append(f"Non-sequential chapters: got {actual}")
 
     result = {
         "mode": mode,
+        "chapter_range": f"{actual[0]}-{actual[-1]}" if actual else None,
         "chapter_count": len(chapters),
         "total_chars": total,
         "errors": errors,
@@ -282,6 +306,81 @@ def validate(file, mode):
 
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0 if result["passed"] else 1)
+
+
+@cli.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--format", "fmt", type=click.Choice(["json", "text"]), default="text")
+def summary(file, fmt):
+    """Generate per-chapter summary and character statistics."""
+    text = _read_file(file)
+    chapters = _split_chapters(text)
+
+    STOP_WORDS = {
+        "我", "你", "他", "她", "它", "我们", "你们", "他们", "她们",
+        "这", "那", "什么", "怎么", "哪", "谁", "自己", "别人", "大家",
+        "所有", "没有", "不是", "可以", "已经", "还是", "因为", "但是",
+        "如果", "虽然", "然后", "不过", "为什么", "可能", "应该", "当然",
+        "我没", "我不", "你不", "你少", "你别", "她又", "他又", "我站",
+        "我看", "我要", "你要", "我让", "他让", "她让", "我转", "我听",
+        "见他", "见她", "见我", "抬头", "出来", "进来", "过来", "过去",
+        "起来", "下去", "回来", "一个", "一下", "两个", "三个",
+        "听见他", "听见她", "门外", "门口", "身后", "面前", "旁边",
+        "对面", "楼下", "楼上", "房间", "客厅", "走廊", "沙发",
+        "她就", "他没", "她没", "你想", "我来", "他来", "她来",
+        "小声", "大声", "床边", "桌上", "人去", "下去", "上去",
+    }
+    NAME_SUFFIX_RE = re.compile(
+        r"(说|笑|问|喊|看|站|走|坐|跑|起身|拍|打|开口|关|拿|接|放|指|让|叫|听|转身|提"
+        r"|拉|推|跟|进来|出去|抬|低头|退|扑|挡|伸手|挤|冲|停|摇头|点头|扔|摔|捂|甩|靠|哭|抖)"
+    )
+
+    char_counts: dict[str, int] = {}
+    chapter_summaries = []
+
+    for ch in chapters:
+        body = ch["body"]
+        lines = [l.strip() for l in body.split("\n") if l.strip()]
+
+        for line in lines:
+            for m in NAME_SUFFIX_RE.finditer(line):
+                start = m.start()
+                for length in (3, 2):
+                    if start >= length:
+                        candidate = line[start - length:start]
+                        if (all("\u4e00" <= c <= "\u9fff" for c in candidate)
+                                and candidate not in STOP_WORDS):
+                            char_counts[candidate] = char_counts.get(candidate, 0) + 1
+
+        opening = lines[0][:60] if lines else ""
+        closing = lines[-1][:60] if lines else ""
+        chars = _count_chars(body)
+
+        chapter_summaries.append({
+            "chapter": ch["number"],
+            "title": ch["title"],
+            "chars": chars,
+            "opening": opening,
+            "closing": closing,
+        })
+
+    top_characters = sorted(char_counts.items(), key=lambda x: -x[1])[:20]
+
+    if fmt == "json":
+        output = {
+            "chapters": chapter_summaries,
+            "characters": [{"name": n, "mentions": c} for n, c in top_characters],
+        }
+        click.echo(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        click.echo(f"=== {len(chapters)} chapters ===\n")
+        for s in chapter_summaries:
+            title_part = f" {s['title']}" if s["title"] else ""
+            click.echo(f"Ch {s['chapter']:>3}{title_part} ({s['chars']} chars)")
+            click.echo(f"  > {s['opening']}")
+        click.echo(f"\n=== Top characters ===\n")
+        for name, cnt in top_characters:
+            click.echo(f"  {name}: {cnt} mentions")
 
 
 if __name__ == "__main__":
