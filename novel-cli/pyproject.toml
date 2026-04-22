@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "novel-cli"
+version = "1.0.0"
+description = "Web novel validation CLI for AI-written Chinese fiction (网文小说校验工具)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+]
+keywords = ["novel", "web-novel", "chinese-fiction", "validation", "openclaw", "arkclaw"]
+
+[project.scripts]
+novel-cli = "novel_cli.cli:cli"
+
+[project.urls]
+Repository = "https://github.com/bolecodex/novel-writer-skills"
