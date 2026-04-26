@@ -32,27 +32,29 @@ novel-cli --help
 
 ## 国内安装（Gitee 镜像）
 
-如果 ArkClaw 环境访问 GitHub 超时，推荐先在 Gitee 创建公开镜像仓库：
-
-1. Gitee 新建仓库 `novel-writer-skills`。
-2. 使用 Gitee 的“导入已有仓库”功能，导入 `https://github.com/bolecodex/novel-writer-skills.git`。
-3. 把下面命令里的 `<你的Gitee用户名>` 换成自己的用户名。
+如果 ArkClaw 环境访问 GitHub 超时，使用 Gitee 镜像：
 
 ```bash
-python3 -m pip install "novel-cli @ git+https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple
-npx skills add https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git@web-novel-writer -y -g
+bash <(curl -fsSL https://gitee.com/bolecodex/novel-writer-skills/raw/main/scripts/setup-gitee.sh)
+```
+
+也可以分步安装：
+
+```bash
+python3 -m pip install "novel-cli @ git+https://gitee.com/bolecodex/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple
+npx skills add https://gitee.com/bolecodex/novel-writer-skills.git@web-novel-writer -y -g
 ```
 
 如果当前 Skills CLI 不支持 `repo@skill` 精确安装，改用整个仓库安装：
 
 ```bash
-npx skills add https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git -y -g
+npx skills add https://gitee.com/bolecodex/novel-writer-skills.git -y -g
 ```
 
 也可以写成一行：
 
 ```bash
-python3 -m pip install "novel-cli @ git+https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple && npx skills add https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git@web-novel-writer -y -g
+python3 -m pip install "novel-cli @ git+https://gitee.com/bolecodex/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple && npx skills add https://gitee.com/bolecodex/novel-writer-skills.git@web-novel-writer -y -g
 ```
 
 安装后重启/刷新 ArkClaw，并检查：
@@ -71,7 +73,7 @@ skills 依赖 `novel-cli` 命令行工具，安装方式：
 python3 -m pip install "novel-cli @ git+https://github.com/bolecodex/novel-writer-skills.git#subdirectory=novel-cli"
 
 # 国内环境：从 Gitee 镜像安装
-python3 -m pip install "novel-cli @ git+https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple
+python3 -m pip install "novel-cli @ git+https://gitee.com/bolecodex/novel-writer-skills.git#subdirectory=novel-cli" -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 方式二：克隆后本地安装
 git clone https://github.com/bolecodex/novel-writer-skills.git
@@ -85,14 +87,14 @@ python3 -m pip install .
 npx skills add bolecodex/novel-writer-skills@web-novel-writer -y -g
 
 # 国内环境：从 Gitee 镜像安装
-npx skills add https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git@web-novel-writer -y -g
+npx skills add https://gitee.com/bolecodex/novel-writer-skills.git@web-novel-writer -y -g
 ```
 
 安装后技能会被 symlink 到对应 Agent 的 skills 目录（如 ArkClaw/OpenClaw/Cursor 的技能目录）。如果当前 Skills CLI 不支持 `repo@skill` 精确安装，也可以安装整个仓库：
 
 ```bash
 npx skills add bolecodex/novel-writer-skills -y -g
-npx skills add https://gitee.com/<你的Gitee用户名>/novel-writer-skills.git -y -g
+npx skills add https://gitee.com/bolecodex/novel-writer-skills.git -y -g
 ```
 
 ## 项目结构
@@ -120,7 +122,8 @@ novel-writer-skills/
 │       ├── __init__.py
 │       └── cli.py
 ├── scripts/
-│   └── setup.sh                # 一键安装脚本
+│   ├── setup.sh                # GitHub 一键安装脚本
+│   └── setup-gitee.sh          # Gitee 一键安装脚本
 └── README.md
 ```
 
