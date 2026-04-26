@@ -5,6 +5,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 import click
 
@@ -45,6 +46,46 @@ CHAPTER_RE = re.compile(r"【第(\d+)章[^】]*】")
 WORD_COUNT_RE = re.compile(r"\[本章字数[：:](\d+)\]")
 TOTAL_COUNT_RE = re.compile(r"【总字数】[：:](\d+)字")
 DIALOGUE_RE = re.compile(r'[\"\'].+?[\"\']|\u201c[^\u201d]+\u201d|\u2018[^\u2019]+\u2019')
+SENTENCE_SPLIT_RE = re.compile(r"[。！？!?；;]+")
+CHINESE_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
+
+PRONOUN_SUBJECTS = ("我们", "你们", "他们", "她们", "我", "你", "他", "她", "它")
+SUBJECT_HINT_RE = re.compile(
+    r"^([\u4e00-\u9fff]{2,4})(?:把|给|在|从|对|向|先|又|也|就|只|还|没|不|正|已经|"
+    r"终于|立刻|马上|抬|低|转|走|坐|站|看|问|说|喊|笑|哭|拿|放|推|拉|关|开|接|递|"
+    r"拍|按|等|回|去|来|进|出|签|填|缴|交|排|挂|拦|上|下)"
+)
+
+ACTION_VERBS = (
+    "走", "坐", "站", "看", "问", "说", "喊", "叫", "笑", "哭", "拿", "放", "推", "拉",
+    "关", "开", "接", "递", "拍", "按", "点", "等", "签",
+    "填", "缴", "交", "排", "挂", "拦", "转", "抬", "低", "停", "跑", "扶",
+    "翻", "找",
+)
+PROCESS_VERBS = (
+    "取号", "拿号", "等号", "排队", "缴费", "交钱", "刷卡", "扫码", "填表", "登记", "挂号",
+    "办手续", "签字", "按手印", "上车", "下车", "拦车", "打车", "开车", "回医院", "回家",
+    "进门", "出门", "进去", "出来", "上楼", "下楼", "坐下", "站起", "起身", "走近", "走开",
+    "转身", "开门", "关门", "推门", "敲门", "接电话", "打电话", "发消息", "回消息", "拍照",
+    "截图", "保存", "收起", "放下", "拿起", "递给", "接过", "翻开", "按下", "点开", "关上",
+    "打开", "洗脸", "喝水", "吃饭", "睡觉", "醒来",
+)
+SPEECH_TAG_RE = re.compile(
+    r"^(?:[\u4e00-\u9fff]{1,4})?(?:又|也|先|只|就|才|低声|小声|大声)?"
+    r"(?:说|问|喊|叫|开口|回答|反问|补|接话|抢话|骂|念|回|笑|冷笑)$"
+)
+SEVERE_STYLE_TYPES = {
+    "staccato_action_chain",
+    "low_value_process_chain",
+    "speech_tag_chain",
+}
+
+STYLE_SUGGESTIONS = {
+    "staccato_action_chain": "压缩低价值动作链，把篇幅让给冲突、感官压力或人物反应。",
+    "repeated_subject_chain": "合并同主语短句，改用自然承接，避免同一主语反复敲点。",
+    "low_value_process_chain": "流程动作只保留关键节点，其余用一句过渡带过。",
+    "speech_tag_chain": "删除连续说话标签，让对话内容、动作或反应承担转场。",
+}
 
 
 def _read_file(path: str) -> str:
@@ -78,6 +119,7 @@ def _split_chapters(text: str) -> list[dict]:
 def _count_chars(text: str) -> int:
     """Count meaningful characters (excluding whitespace and markup)."""
     cleaned = re.sub(r"\[本章字数[：:]\d+\]", "", text)
+    cleaned = TOTAL_COUNT_RE.sub("", cleaned)
     cleaned = re.sub(r"【[^】]+】", "", cleaned)
     cleaned = re.sub(r"\s+", "", cleaned)
     return len(cleaned)
@@ -92,8 +134,233 @@ def _dialogue_ratio(text: str) -> float:
     return round(dialogue_chars / total, 3)
 
 
+def _is_marker_line(line: str) -> bool:
+    stripped = line.strip()
+    return (
+        not stripped
+        or stripped.startswith("【")
+        or stripped.startswith("[本章字数")
+        or stripped.startswith("【总字数")
+    )
+
+
+def _is_dialogue_line(line: str) -> bool:
+    stripped = line.strip()
+    if len(stripped) < 2:
+        return False
+    quote_pairs = (('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’"))
+    if any(stripped.startswith(left) and stripped.endswith(right) for left, right in quote_pairs):
+        return True
+    quoted_chars = sum(len(m.group()) for m in DIALOGUE_RE.finditer(stripped))
+    chinese_chars = len(CHINESE_CHAR_RE.findall(stripped))
+    return chinese_chars > 0 and quoted_chars / max(len(stripped), 1) >= 0.65
+
+
+def _normalize_clause(clause: str) -> str:
+    return clause.strip().strip('"“”‘’').replace(" ", "")
+
+
+def _split_clauses(line: str) -> list[str]:
+    clauses = []
+    for clause in SENTENCE_SPLIT_RE.split(line):
+        normalized = _normalize_clause(clause)
+        if normalized:
+            clauses.append(normalized)
+    return clauses
+
+
+def _extract_subject(clause: str) -> Optional[str]:
+    for subject in PRONOUN_SUBJECTS:
+        if clause.startswith(subject):
+            return subject
+    match = SUBJECT_HINT_RE.match(clause)
+    if match:
+        candidate = match.group(1)
+        if any(pronoun in candidate for pronoun in PRONOUN_SUBJECTS):
+            return None
+        return candidate
+    return None
+
+
+def _has_any(text: str, words: tuple[str, ...]) -> bool:
+    return any(word in text for word in words)
+
+
+def _is_action_clause(clause: str) -> bool:
+    if len(clause) > 18 or "：" in clause or ":" in clause:
+        return False
+    return _extract_subject(clause) is not None and _has_any(clause, ACTION_VERBS)
+
+
+def _is_process_clause(clause: str) -> bool:
+    if len(clause) > 22:
+        return False
+    return _has_any(clause, PROCESS_VERBS)
+
+
+def _is_speech_tag_clause(clause: str) -> bool:
+    return len(clause) <= 10 and bool(SPEECH_TAG_RE.match(clause))
+
+
+def _style_finding(line_no: int, issue_type: str, clauses: list[str], context: str) -> dict:
+    severity = "error" if issue_type in SEVERE_STYLE_TYPES else "warning"
+    first = clauses[0] if clauses else context
+    column = max(context.find(first) + 1, 1)
+    return {
+        "line": line_no,
+        "column": column,
+        "word": " / ".join(clauses),
+        "type": issue_type,
+        "severity": severity,
+        "context": context.strip(),
+        "suggestion": STYLE_SUGGESTIONS[issue_type],
+    }
+
+
+def _add_unique_finding(findings: list[dict], finding: dict, seen: set[tuple]) -> None:
+    key = (finding["line"], finding["type"], finding["word"])
+    if key not in seen:
+        findings.append(finding)
+        seen.add(key)
+
+
+def _scan_banned_words(lines: list[str]) -> list[dict]:
+    findings = []
+    for line_no, line in enumerate(lines, 1):
+        for word in BANNED_WORDS:
+            start = 0
+            while True:
+                idx = line.find(word, start)
+                if idx == -1:
+                    break
+                findings.append({
+                    "line": line_no,
+                    "column": idx + 1,
+                    "word": word,
+                    "type": "banned_word",
+                    "severity": "error",
+                    "context": line[max(0, idx - 10):idx + len(word) + 10].strip(),
+                })
+                start = idx + 1
+
+        for pattern in BANNED_PATTERNS:
+            for m in pattern.finditer(line):
+                findings.append({
+                    "line": line_no,
+                    "column": m.start() + 1,
+                    "word": m.group(),
+                    "type": "banned_pattern",
+                    "severity": "error",
+                    "context": line[max(0, m.start() - 10):m.end() + 10].strip(),
+                })
+    return findings
+
+
+def _scan_style(lines: list[str]) -> list[dict]:
+    findings: list[dict] = []
+    seen: set[tuple] = set()
+    narrative_clauses: list[dict] = []
+    block_id = 0
+
+    for line_no, line in enumerate(lines, 1):
+        if _is_marker_line(line) or _is_dialogue_line(line):
+            block_id += 1
+            continue
+        style_line = DIALOGUE_RE.sub("", line)
+        clauses = _split_clauses(style_line)
+        if not clauses:
+            block_id += 1
+            continue
+
+        classified = []
+        for clause in clauses:
+            item = {
+                "line": line_no,
+                "text": clause,
+                "subject": _extract_subject(clause),
+                "action": _is_action_clause(clause),
+                "process": _is_process_clause(clause),
+                "speech": _is_speech_tag_clause(clause),
+                "context": line,
+                "block": block_id,
+            }
+            classified.append(item)
+            narrative_clauses.append(item)
+
+        for start in range(0, max(len(classified) - 2, 0)):
+            window = classified[start:start + 3]
+            clauses = [item["text"] for item in window]
+            subjects = [item["subject"] for item in window if item["subject"]]
+            if len(subjects) == 3 and len(set(subjects)) == 1 and all(2 <= len(item["text"]) <= 18 for item in window):
+                _add_unique_finding(
+                    findings,
+                    _style_finding(line_no, "repeated_subject_chain", clauses, line),
+                    seen,
+                )
+            if all(2 <= len(item["text"]) <= 22 and item["process"] for item in window):
+                _add_unique_finding(
+                    findings,
+                    _style_finding(line_no, "low_value_process_chain", clauses, line),
+                    seen,
+                )
+            elif all(2 <= len(item["text"]) <= 10 and item["speech"] for item in window):
+                _add_unique_finding(
+                    findings,
+                    _style_finding(line_no, "speech_tag_chain", clauses, line),
+                    seen,
+                )
+            elif all(2 <= len(item["text"]) <= 18 and item["action"] for item in window):
+                _add_unique_finding(
+                    findings,
+                    _style_finding(line_no, "staccato_action_chain", clauses, line),
+                    seen,
+                )
+
+    for index in range(0, max(len(narrative_clauses) - 2, 0)):
+        window = narrative_clauses[index:index + 3]
+        if len({item["block"] for item in window}) > 1:
+            continue
+        lines_in_window = {item["line"] for item in window}
+        if len(lines_in_window) == 1:
+            continue
+        context = " ".join(item["context"].strip() for item in window)
+        clauses = [item["text"] for item in window]
+        subjects = [item["subject"] for item in window if item["subject"]]
+        if all(item["process"] for item in window):
+            _add_unique_finding(
+                findings,
+                _style_finding(window[0]["line"], "low_value_process_chain", clauses, context),
+                seen,
+            )
+        elif all(item["speech"] for item in window):
+            _add_unique_finding(
+                findings,
+                _style_finding(window[0]["line"], "speech_tag_chain", clauses, context),
+                seen,
+            )
+        elif all(item["action"] for item in window) and (len(set(subjects)) <= 2 or sum(item["process"] for item in window) >= 2):
+            _add_unique_finding(
+                findings,
+                _style_finding(window[0]["line"], "staccato_action_chain", clauses, context),
+                seen,
+            )
+        elif len(subjects) == 3 and len(set(subjects)) == 1:
+            _add_unique_finding(
+                findings,
+                _style_finding(window[0]["line"], "repeated_subject_chain", clauses, context),
+                seen,
+            )
+
+    return findings
+
+
+def _scan_text(text: str) -> list[dict]:
+    lines = text.split("\n")
+    return _scan_banned_words(lines) + _scan_style(lines)
+
+
 @click.group()
-@click.version_option("1.1.0")
+@click.version_option("1.2.0")
 def cli():
     """novel-cli: Web novel validation toolkit."""
     pass
@@ -143,36 +410,9 @@ def count(file, fmt):
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--format", "fmt", type=click.Choice(["json", "text"]), default="json")
 def scan(file, fmt):
-    """Scan for banned words and AI-slop patterns."""
+    """Scan for banned words and mechanical narration patterns."""
     text = _read_file(file)
-    lines = text.split("\n")
-    findings = []
-
-    for line_no, line in enumerate(lines, 1):
-        for word in BANNED_WORDS:
-            start = 0
-            while True:
-                idx = line.find(word, start)
-                if idx == -1:
-                    break
-                findings.append({
-                    "line": line_no,
-                    "column": idx + 1,
-                    "word": word,
-                    "type": "banned_word",
-                    "context": line[max(0, idx - 10):idx + len(word) + 10].strip(),
-                })
-                start = idx + 1
-
-        for pattern in BANNED_PATTERNS:
-            for m in pattern.finditer(line):
-                findings.append({
-                    "line": line_no,
-                    "column": m.start() + 1,
-                    "word": m.group(),
-                    "type": "banned_pattern",
-                    "context": line[max(0, m.start() - 10):m.end() + 10].strip(),
-                })
+    findings = _scan_text(text)
 
     output = {"total_issues": len(findings), "findings": findings}
 
@@ -180,13 +420,16 @@ def scan(file, fmt):
         click.echo(json.dumps(output, ensure_ascii=False, indent=2))
     else:
         if not findings:
-            click.echo("No banned words or patterns found.")
+            click.echo("No banned words, banned patterns, or style issues found.")
         else:
             click.echo(f"Found {len(findings)} issues:\n")
             for f in findings:
+                severity = f.get("severity", "error")
+                suggestion = f.get("suggestion")
+                suffix = f" | {suggestion}" if suggestion else ""
                 click.echo(
-                    f"  L{f['line']}:C{f['column']} [{f['type']}] "
-                    f"\"{f['word']}\" — ...{f['context']}..."
+                    f"  L{f['line']}:C{f['column']} [{severity}/{f['type']}] "
+                    f"\"{f['word']}\" — ...{f['context']}...{suffix}"
                 )
 
 
@@ -269,15 +512,29 @@ def validate(file, mode, ch_from, ch_to):
                 f"Ch {ch['number']}: dialogue ratio {dr:.0%} < {dialogue_threshold:.0%} target"
             )
 
-    banned_count = 0
-    for ch in chapters:
-        for line in ch["body"].split("\n"):
-            for word in BANNED_WORDS:
-                banned_count += line.count(word)
-            for pattern in BANNED_PATTERNS:
-                banned_count += len(pattern.findall(line))
+    findings = _scan_text("\n".join(ch["body"] for ch in chapters))
+    banned_count = sum(
+        1 for finding in findings
+        if finding["type"] in {"banned_word", "banned_pattern"}
+    )
     if banned_count > 0:
         errors.append(f"Banned words/patterns found: {banned_count} instances (run 'scan' for details)")
+    style_errors = [
+        finding for finding in findings
+        if finding.get("severity") == "error" and finding["type"] not in {"banned_word", "banned_pattern"}
+    ]
+    style_warnings = [
+        finding for finding in findings
+        if finding.get("severity") == "warning" and finding["type"] not in {"banned_word", "banned_pattern"}
+    ]
+    if style_errors:
+        errors.append(
+            f"Severe mechanical narration found: {len(style_errors)} instances (run 'scan' for details)"
+        )
+    if style_warnings:
+        warnings.append(
+            f"Mechanical narration warnings: {len(style_warnings)} instances (run 'scan' for details)"
+        )
 
     total = sum(_count_chars(ch["body"]) for ch in chapters)
 

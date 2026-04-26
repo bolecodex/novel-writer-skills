@@ -8,3 +8,19 @@ build/
 output/
 docs/
 *.plan.md
+
+# Local manuscript drafts and one-off generation helpers.
+# Keep publishable package code in git; keep working novels out of commits.
+ch*.txt
+ch*.md
+vol*_ch*.txt
+temp_*.txt
+draft_*.txt
+frag*.txt
+batch_*.txt
+*_第*.txt
+.append_*.txt
+.do_append.py
+assemble_vol*.py
+gen_vol*.py
+batch_append_*.py

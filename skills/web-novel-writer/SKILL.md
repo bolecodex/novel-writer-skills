@@ -7,6 +7,9 @@ metadata:
   openclaw:
     requires:
       bins: [novel-cli, python3]
+  arkclaw:
+    requires:
+      bins: [novel-cli, python3]
 ---
 
 # 网文小说创作
@@ -53,7 +56,7 @@ pip install "novel-cli @ git+https://github.com/bolecodex/novel-writer-skills.gi
 
 1. **独立则并行**：对互不依赖的任务并行启动独立子任务（如同时生成3个脑洞方案）。
 2. **依赖则串行**：需要情节连贯性的章节按顺序写。
-3. **CLI 校验**：写完后运行 `novel-cli` 校验字数和禁用词。
+3. **CLI 校验**：写完后运行 `novel-cli` 校验字数、禁用词和机械断句。
 4. **人在回路**：将关键选择（公式选择、情节走向、角色弧线）交给用户决定。
 
 ### 第四步：流水线模式
@@ -81,7 +84,7 @@ pip install "novel-cli @ git+https://github.com/bolecodex/novel-writer-skills.gi
 
 ```bash
 novel-cli count <file>                            # 章节字数与对话占比
-novel-cli scan <file>                             # 禁用词/AI味检测
+novel-cli scan <file>                             # 禁用词/AI味/机械断句检测
 novel-cli outline <file>                          # 提取章节大纲
 novel-cli validate <file>                         # 综合校验（自动检测模式）
 novel-cli validate <file> --mode long             # 长篇模式校验
@@ -89,11 +92,12 @@ novel-cli validate <file> --from 11 --to 45       # 只校验第11-45章
 novel-cli summary <file>                          # 每章摘要+角色出场统计
 ```
 
-每个写作阶段完成后务必运行 `novel-cli validate`。
+每个写作阶段完成后务必运行 `novel-cli scan` 和 `novel-cli validate`，严重风格问题必须修复后再交付。
 
 ## 输出规范
 
 - 所有小说正文必须是**纯文本**——不加粗、不用 Markdown 格式
-- 每句话独立一行
+- 正文使用自然段换行，同一自然段内多句连写；不要每句话单独换行，也不要在每句话之间插空行
+- 禁止机械动作清单式断句，如连续罗列动作、流程、位移、操作或说话标签
 - 章节标题格式：`【第X章 章节标题】`
 - 每章结尾标注：`[本章字数：XXXX]`
